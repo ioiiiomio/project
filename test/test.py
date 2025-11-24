@@ -6,7 +6,7 @@ from tensorflow.keras.models import load_model
 
 BASE_TEST = "/Users/amayakof/Desktop/2025_autumn/deep_learning/SIS/3/project/test/img"
 MODEL_DIR = "/Users/amayakof/Desktop/2025_autumn/deep_learning/SIS/3/project/models"
-RESULT_DIR = "/Users/amayakof/Desktop/2025_autumn/deep_learning/SIS/3/project/results"
+RESULT_DIR = "/Users/amayakof/Desktop/2025_autumn/deep_learning/SIS/3/project/results/simple_mod"
 
 os.makedirs(RESULT_DIR, exist_ok=True)
 
