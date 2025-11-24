@@ -68,18 +68,18 @@ def show_results_grid(inputs, outputs, names, rows=6):
     plt.figure(figsize=(8, n * 4))
 
     for i in range(n):
-        inp = inputs[i].squeeze()
-        out = outputs[i].squeeze()
+        inp = inputs[i]
+        out = outputs[i]
 
         # Input image
         plt.subplot(n, 2, i*2 + 1)
-        plt.imshow(inp, cmap='gray')
+        plt.imshow(inp)
         plt.title(f"Input: {names[i]}")
         plt.axis("off")
 
         # Stylized output
         plt.subplot(n, 2, i*2 + 2)
-        plt.imshow(out, cmap='gray')
+        plt.imshow(out)
         plt.title(f"Stylized ({STYLE})")
         plt.axis("off")
 
