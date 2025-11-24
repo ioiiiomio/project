@@ -106,10 +106,6 @@ for fname in sorted(os.listdir(BASE_INPUT)):
     # save preprocessed input copy
     cv2.imwrite(os.path.join(PREP_INPUT, fname), img)
 
-    # posterize style
-    poster = posterize_bgr(img, levels=6)
-    cv2.imwrite(os.path.join(POSTER_DIR, fname), poster)
-
     # outlines style C
     outl = outlines_soft(img, levels=6)
     cv2.imwrite(os.path.join(OUTLINE_DIR, fname), outl)
