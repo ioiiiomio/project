@@ -2,114 +2,133 @@ import os
 import cv2
 import numpy as np
 
-# -------- PATHS --------
-BASE_INPUT = "/Users/amayakof/Desktop/2025_autumn/deep_learning/SIS/3/project/data/raw/input"
-PREP_INPUT = "/Users/amayakof/Desktop/2025_autumn/deep_learning/SIS/3/project/data/preprocessed/input"
+# ------------------------------
+# CONFIG
+# ------------------------------
+RAW_INPUT = "/Users/amayakof/Desktop/2025_autumn/deep_learning/SIS/3/project/data/raw/input"
+RAW_STYLE_ROOT = "/Users/amayakof/Desktop/2025_autumn/deep_learning/SIS/3/project/data/raw/style"
 
-POSTER_DIR = "/Users/amayakof/Desktop/2025_autumn/deep_learning/SIS/3/project/data/preprocessed/style/poster"
-OUTLINE_DIR = "/Users/amayakof/Desktop/2025_autumn/deep_learning/SIS/3/project/data/preprocessed/style/outline"
+PREP_INPUT = "/Users/amayakof/Desktop/2025_autumn/deep_learning/SIS/3/project/data/preprocessed/input"
+PREP_STYLE_ROOT = "/Users/amayakof/Desktop/2025_autumn/deep_learning/SIS/3/project/data/preprocessed/style"
 
 RESIZE_TO = (256, 256)
 VALID_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".tiff"}
 
 os.makedirs(PREP_INPUT, exist_ok=True)
-os.makedirs(POSTER_DIR, exist_ok=True)
-os.makedirs(OUTLINE_DIR, exist_ok=True)
+os.makedirs(PREP_STYLE_ROOT, exist_ok=True)
 
+# ------------------------------
+# STYLE FUNCTIONS
+# ------------------------------
 
 def posterize_bgr(img, levels=6):
-    """Mild posterization in BGR."""
     x = img.astype(np.float32) / 255.0
     x = np.floor(x * levels) / levels
     return (x * 255).astype(np.uint8)
 
 
 def outlines_soft(img, levels=6):
-    """
-    SOFT OUTLINE VERSION:
-    - lighter outlines (dark gray instead of black)
-    - thinner lines
-    - combines posterization + color smoothing + soft edges
-    """
-
-    # 1) Posterize base
     base = posterize_bgr(img, levels=levels)
-
-    # 2) Smooth color (bilateral filter)
     smooth = cv2.bilateralFilter(base, d=9, sigmaColor=50, sigmaSpace=50)
 
-    # 3) Extract edges
     gray = cv2.cvtColor(base, cv2.COLOR_BGR2GRAY)
-    edges = cv2.Canny(gray, 40, 120)              # LOWER thresholds → thinner lines
+    edges = cv2.Canny(gray, 40, 120)
+    edges_soft = cv2.GaussianBlur(edges, (5, 5), 0)
 
-    # 4) Blur edges to make them softer & smoother
-    edges_soft = cv2.GaussianBlur(edges, (5,5), 0)
-
-    # 5) Convert edges to RGB
     edges_rgb = cv2.cvtColor(edges_soft, cv2.COLOR_GRAY2BGR)
 
-    # 6) Lighten the outline color (dark gray instead of black)
-    #    0 would be pure black → we make edges ~30% black
-    light_edges = 255 - edges_rgb  # invert
+    light_edges = 255 - edges_rgb
     light_edges = (light_edges * 0.30).astype(np.uint8) + 180
 
-    # 7) Alpha-blend outlines on top of smooth colors
-    #    alpha controls how strong outlines are
-    alpha = 0.45  # lower → lighter lines
+    alpha = 0.45
     output = cv2.addWeighted(smooth, 1.0, light_edges, alpha, 0)
 
     return output
 
-    """
-    Style C: posterize + smooth color + dark outlines.
-    Everything stays in BGR.
-    """
-    # 1) Posterize base
-    base = posterize_bgr(img, levels=levels)
 
-    # 2) Smooth colors
-    color = cv2.bilateralFilter(base, d=9, sigmaColor=75, sigmaSpace=75)
+# ------------------------------
+# PROCESS RAW INPUT (resize only)
+# ------------------------------
+print("\n=== Processing RAW INPUT ===")
+for fname in sorted(os.listdir(RAW_INPUT)):
+    ext = os.path.splitext(fname)[1].lower()
+    if ext not in VALID_EXT: 
+        continue
 
-    # 3) Edges from grayscale
-    gray = cv2.cvtColor(base, cv2.COLOR_BGR2GRAY)
-    edges = cv2.Canny(gray, 80, 180)
+    path = os.path.join(RAW_INPUT, fname)
+    img = cv2.imread(path)
 
-    # Slightly thicken outlines
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    edges = cv2.dilate(edges, kernel, iterations=1)
+    if img is None:
+        print("Skipping:", path)
+        continue
 
-    # 4) Invert edges so lines are dark on bright
-    edges_inv = 255 - edges
-    edges_inv = cv2.cvtColor(edges_inv, cv2.COLOR_GRAY2BGR)
+    img = cv2.resize(img, RESIZE_TO)
+    cv2.imwrite(os.path.join(PREP_INPUT, fname), img)
 
-    # 5) Combine: keep color only where edge mask is bright
-    out = cv2.bitwise_and(color, edges_inv)
-    return out
+print("Input preprocessing done.")
 
 
-# -------------- MAIN LOOP --------------
-for fname in sorted(os.listdir(BASE_INPUT)):
+# ------------------------------
+# PROCESS RAW STYLE FOLDERS
+# ------------------------------
+print("\n=== Processing RAW STYLE FOLDERS ===")
+
+# detect all style folders automatically
+style_folders = [
+    f for f in os.listdir(RAW_STYLE_ROOT)
+    if os.path.isdir(os.path.join(RAW_STYLE_ROOT, f))
+]
+
+print("Found styles:", style_folders)
+
+for style in style_folders:
+    raw_style_dir = os.path.join(RAW_STYLE_ROOT, style)
+    prep_style_dir = os.path.join(PREP_STYLE_ROOT, style)
+    os.makedirs(prep_style_dir, exist_ok=True)
+
+    print(f"\n-- Processing style '{style}' --")
+
+    for fname in sorted(os.listdir(raw_style_dir)):
+        ext = os.path.splitext(fname)[1].lower()
+        if ext not in VALID_EXT:
+            continue
+
+        path = os.path.join(raw_style_dir, fname)
+        img = cv2.imread(path)
+
+        if img is None:
+            print("Skipping unreadable:", path)
+            continue
+
+        img = cv2.resize(img, RESIZE_TO)
+        cv2.imwrite(os.path.join(prep_style_dir, fname), img)
+
+print("Finished resizing all style folders.")
+
+
+# ------------------------------
+# GENERATE EXTRA STYLE VERSIONS (poster, outline)
+# ------------------------------
+print("\n=== Generating Poster & Outline Styles ===")
+
+POSTER_OUT = os.path.join(PREP_STYLE_ROOT, "poster")
+OUTLINE_OUT = os.path.join(PREP_STYLE_ROOT, "outline")
+
+os.makedirs(POSTER_OUT, exist_ok=True)
+os.makedirs(OUTLINE_OUT, exist_ok=True)
+
+for fname in sorted(os.listdir(PREP_INPUT)):
     ext = os.path.splitext(fname)[1].lower()
     if ext not in VALID_EXT:
         continue
 
-    src_path = os.path.join(BASE_INPUT, fname)
+    img_path = os.path.join(PREP_INPUT, fname)
+    img = cv2.imread(img_path)
 
-    img = cv2.imread(src_path)
-    if img is None:
-        print("Skipping unreadable:", src_path)
-        continue
+    poster = posterize_bgr(img, levels=6)
+    outline = outlines_soft(img, levels=6)
 
-    # resize first for consistency
-    img = cv2.resize(img, RESIZE_TO)
+    cv2.imwrite(os.path.join(POSTER_OUT, fname), poster)
+    cv2.imwrite(os.path.join(OUTLINE_OUT, fname), outline)
 
-    # save preprocessed input copy
-    cv2.imwrite(os.path.join(PREP_INPUT, fname), img)
-
-    # outlines style C
-    outl = outlines_soft(img, levels=6)
-    cv2.imwrite(os.path.join(OUTLINE_DIR, fname), outl)
-
-    print("Processed:", fname)
-
-print("\nStyle generation complete.")
+print("\n=== All preprocessing complete. ===")
